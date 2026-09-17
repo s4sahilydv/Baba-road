@@ -7,173 +7,314 @@ const jwt = require("jsonwebtoken");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const SECRET = process.env.JWT_SECRET || "brc-change-this-secret";
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@brc.com";
-const ADMIN_PASSWORD =
-  process.env.ADMIN_PASSWORD || "ChangeThisAdminPassword123";
+const SECRET =
+  process.env.JWT_SECRET || "brc-change-this-secret";
 
-const db = new sqlite3.Database("./brc.db");
+const ADMIN_EMAIL =
+  process.env.ADMIN_EMAIL || "admin@brc.com";
 
-app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
+const DB_PATH =
+  process.env.DB_PATH || path.join(__dirname, "brc.db");
 
-/* ================= DATABASE ================= */
+// ----------------------------------------------------
+// DATABASE
+// ----------------------------------------------------
+
+const db = new sqlite3.Database(DB_PATH, (err) => {
+  if (err) {
+    console.error("Database connection error:", err.message);
+  } else {
+    console.log("SQLite database connected");
+  }
+});
 
 db.serialize(() => {
   db.run(`
-    CREATE TABLE IF NOT EXISTS users(
+    CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT,
-      email TEXT UNIQUE,
-      password TEXT,
-      role TEXT,
-      created_at TEXT
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      phone TEXT,
+      password TEXT NOT NULL,
+      role TEXT DEFAULT 'user',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
   db.run(`
-    CREATE TABLE IF NOT EXISTS loads(
+    CREATE TABLE IF NOT EXISTS loads (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER,
-      from_city TEXT,
-      to_city TEXT,
-      load_date TEXT,
-      truck_type TEXT,
-      weight TEXT,
+      from_location TEXT NOT NULL,
+      to_location TEXT NOT NULL,
       material TEXT,
-      rate TEXT,
-      status TEXT DEFAULT 'Open',
-      created_at TEXT
+      weight TEXT,
+      vehicle_type TEXT,
+      pickup_date TEXT,
+      price TEXT,
+      description TEXT,
+      status TEXT DEFAULT 'available',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(user_id) REFERENCES users(id)
     )
   `);
 
   db.run(`
-    CREATE TABLE IF NOT EXISTS trucks(
+    CREATE TABLE IF NOT EXISTS trucks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER,
-      number TEXT,
-      type TEXT,
+      truck_number TEXT NOT NULL,
+      truck_type TEXT,
       capacity TEXT,
-      status TEXT DEFAULT 'Available'
+      driver_name TEXT,
+      driver_phone TEXT,
+      status TEXT DEFAULT 'Available',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(user_id) REFERENCES users(id)
     )
   `);
 
   db.run(`
-    CREATE TABLE IF NOT EXISTS applications(
+    CREATE TABLE IF NOT EXISTS load_requests (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       load_id INTEGER,
-      applicant_id INTEGER,
-      truck_id INTEGER,
+      user_id INTEGER,
+      message TEXT,
       status TEXT DEFAULT 'Pending',
-      created_at TEXT
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(load_id) REFERENCES loads(id),
+      FOREIGN KEY(user_id) REFERENCES users(id)
     )
   `);
+
+  db.get(
+    `SELECT id FROM users WHERE email = ?`,
+    [ADMIN_EMAIL],
+    async (err, row) => {
+      if (err) {
+        console.error(err.message);
+        return;
+      }
+
+      if (!row) {
+        const password = await bcrypt.hash("admin123", 10);
+
+        db.run(
+          `
+          INSERT INTO users
+          (name, email, phone, password, role)
+          VALUES (?, ?, ?, ?, ?)
+          `,
+          [
+            "BRC Admin",
+            ADMIN_EMAIL,
+            "",
+            password,
+            "admin"
+          ],
+          (insertErr) => {
+            if (insertErr) {
+              console.error(
+                "Admin creation error:",
+                insertErr.message
+              );
+            } else {
+              console.log("Default admin created");
+              console.log("Email:", ADMIN_EMAIL);
+              console.log("Password: admin123");
+            }
+          }
+        );
+      }
+    }
+  );
 });
 
-/* ================= AUTH ================= */
+// ----------------------------------------------------
+// MIDDLEWARE
+// ----------------------------------------------------
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+app.use(express.static(path.join(__dirname, "public")));
+
+function createToken(user) {
+  return jwt.sign(
+    {
+      id: user.id,
+      email: user.email,
+      role: user.role
+    },
+    SECRET,
+    {
+      expiresIn: "7d"
+    }
+  );
+}
 
 function auth(req, res, next) {
+  const header = req.headers.authorization;
+
+  if (!header) {
+    return res.status(401).json({
+      success: false,
+      message: "Login required"
+    });
+  }
+
+  const token = header.startsWith("Bearer ")
+    ? header.substring(7)
+    : header;
+
   try {
-    const token = (req.headers.authorization || "").replace("Bearer ", "");
-
-    req.user = jwt.verify(token, SECRET);
-
+    const decoded = jwt.verify(token, SECRET);
+    req.user = decoded;
     next();
-  } catch (e) {
-    res.status(401).json({
-      error: "Please login"
+  } catch (err) {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid or expired token"
     });
   }
 }
 
-function adminAuth(req, res, next) {
+function adminOnly(req, res, next) {
+  if (!req.user || req.user.role !== "admin") {
+    return res.status(403).json({
+      success: false,
+      message: "Admin access required"
+    });
+  }
+
+  next();
+}
+
+// ----------------------------------------------------
+// HOME
+// ----------------------------------------------------
+
+app.get("/", (req, res) => {
+  res.sendFile(
+    path.join(__dirname, "public", "index.html")
+  );
+});
+
+// ----------------------------------------------------
+// HEALTH CHECK
+// ----------------------------------------------------
+
+app.get("/api/health", (req, res) => {
+  res.json({
+    success: true,
+    message: "BRC server is running",
+    time: new Date().toISOString()
+  });
+});
+
+// ----------------------------------------------------
+// REGISTER
+// ----------------------------------------------------
+
+app.post("/api/register", async (req, res) => {
   try {
-    const token = (req.headers.authorization || "").replace("Bearer ", "");
+    const {
+      name,
+      email,
+      phone,
+      password
+    } = req.body;
 
-    const user = jwt.verify(token, SECRET);
-
-    if (user.role !== "admin") {
-      return res.status(403).json({
-        error: "Admin access required"
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, email and password are required"
       });
     }
 
-    req.user = user;
-    next();
-  } catch (e) {
-    res.status(401).json({
-      error: "Admin login required"
-    });
-  }
-}
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters"
+      });
+    }
 
-/* ================= REGISTER ================= */
+    const cleanEmail = email.trim().toLowerCase();
 
-app.post("/api/register", async (req, res) => {
-  const {
-    name,
-    email,
-    password,
-    role = "Transporter"
-  } = req.body;
-
-  if (!name || !email || !password) {
-    return res.status(400).json({
-      error: "All fields are required"
-    });
-  }
-
-  try {
-    const hash = await bcrypt.hash(password, 10);
-
-    db.run(
-      `
-      INSERT INTO users
-      (name,email,password,role,created_at)
-      VALUES(?,?,?,?,datetime('now'))
-      `,
-      [
-        name,
-        email.toLowerCase(),
-        hash,
-        role
-      ],
-      function (err) {
+    db.get(
+      `SELECT id FROM users WHERE email = ?`,
+      [cleanEmail],
+      async (err, existing) => {
         if (err) {
-          return res.status(400).json({
-            error: "Email already registered"
+          return res.status(500).json({
+            success: false,
+            message: "Database error"
           });
         }
 
-        const token = jwt.sign(
-          {
-            id: this.lastID,
-            name,
-            email: email.toLowerCase(),
-            role
-          },
-          SECRET
-        );
+        if (existing) {
+          return res.status(409).json({
+            success: false,
+            message: "Email already registered"
+          });
+        }
 
-        res.json({
-          token,
-          user: {
-            id: this.lastID,
-            name,
-            email: email.toLowerCase(),
-            role
+        const hashedPassword =
+          await bcrypt.hash(password, 10);
+
+        db.run(
+          `
+          INSERT INTO users
+          (name, email, phone, password, role)
+          VALUES (?, ?, ?, ?, ?)
+          `,
+          [
+            name.trim(),
+            cleanEmail,
+            phone || "",
+            hashedPassword,
+            "user"
+          ],
+          function (insertErr) {
+            if (insertErr) {
+              return res.status(500).json({
+                success: false,
+                message: insertErr.message
+              });
+            }
+
+            const user = {
+              id: this.lastID,
+              name: name.trim(),
+              email: cleanEmail,
+              role: "user"
+            };
+
+            const token = createToken(user);
+
+            res.json({
+              success: true,
+              message: "Registration successful",
+              token,
+              user
+            });
           }
-        });
+        );
       }
     );
-  } catch (e) {
+  } catch (err) {
+    console.error(err);
+
     res.status(500).json({
-      error: "Server error"
+      success: false,
+      message: "Server error"
     });
   }
 });
 
-/* ================= LOGIN ================= */
+// ----------------------------------------------------
+// LOGIN
+// ----------------------------------------------------
 
 app.post("/api/login", (req, res) => {
   const {
@@ -181,136 +322,260 @@ app.post("/api/login", (req, res) => {
     password
   } = req.body;
 
+  if (!email || !password) {
+    return res.status(400).json({
+      success: false,
+      message: "Email and password are required"
+    });
+  }
+
+  const cleanEmail =
+    email.trim().toLowerCase();
+
   db.get(
-    "SELECT * FROM users WHERE email=?",
-    [String(email || "").toLowerCase()],
-    async (err, u) => {
-      if (
-        err ||
-        !u ||
-        !(await bcrypt.compare(password || "", u.password))
-      ) {
-        return res.status(401).json({
-          error: "Invalid email or password"
+    `
+    SELECT *
+    FROM users
+    WHERE email = ?
+    `,
+    [cleanEmail],
+    async (err, user) => {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: "Database error"
         });
       }
 
-      const token = jwt.sign(
-        {
-          id: u.id,
-          name: u.name,
-          email: u.email,
-          role: u.role
-        },
-        SECRET
-      );
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid email or password"
+        });
+      }
+
+      const valid =
+        await bcrypt.compare(
+          password,
+          user.password
+        );
+
+      if (!valid) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid email or password"
+        });
+      }
+
+      const safeUser = {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role
+      };
+
+      const token =
+        createToken(safeUser);
 
       res.json({
+        success: true,
+        message: "Login successful",
         token,
-        user: {
-          id: u.id,
-          name: u.name,
-          email: u.email,
-          role: u.role
-        }
+        user: safeUser
       });
     }
   );
 });
 
-/* ================= ADMIN LOGIN ================= */
+// ----------------------------------------------------
+// CURRENT USER
+// ----------------------------------------------------
 
-app.post("/api/admin/login", (req, res) => {
+app.get("/api/me", auth, (req, res) => {
+  db.get(
+    `
+    SELECT id, name, email, phone, role, created_at
+    FROM users
+    WHERE id = ?
+    `,
+    [req.user.id],
+    (err, user) => {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: "Database error"
+        });
+      }
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found"
+        });
+      }
+
+      res.json({
+        success: true,
+        user
+      });
+    }
+  );
+});
+
+// ----------------------------------------------------
+// UPDATE PROFILE
+// ----------------------------------------------------
+
+app.put("/api/profile", auth, (req, res) => {
   const {
-    email,
-    password
+    name,
+    phone
   } = req.body;
 
-  if (
-    String(email || "").toLowerCase() !== ADMIN_EMAIL.toLowerCase() ||
-    password !== ADMIN_PASSWORD
-  ) {
-    return res.status(401).json({
-      error: "Invalid admin credentials"
+  if (!name) {
+    return res.status(400).json({
+      success: false,
+      message: "Name is required"
     });
   }
 
-  const token = jwt.sign(
-    {
-      id: 0,
-      name: "Administrator",
-      email: ADMIN_EMAIL,
-      role: "admin"
-    },
-    SECRET
-  );
+  db.run(
+    `
+    UPDATE users
+    SET name = ?, phone = ?
+    WHERE id = ?
+    `,
+    [
+      name.trim(),
+      phone || "",
+      req.user.id
+    ],
+    function (err) {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: err.message
+        });
+      }
 
-  res.json({
-    token,
-    user: {
-      name: "Administrator",
-      email: ADMIN_EMAIL,
-      role: "admin"
+      res.json({
+        success: true,
+        message: "Profile updated"
+      });
     }
-  });
+  );
 });
 
-/* ================= ME ================= */
+// ----------------------------------------------------
+// CHANGE PASSWORD
+// ----------------------------------------------------
 
-app.get("/api/me", auth, (req, res) => {
-  res.json(req.user);
+app.put("/api/change-password", auth, async (req, res) => {
+  const {
+    oldPassword,
+    newPassword
+  } = req.body;
+
+  if (!oldPassword || !newPassword) {
+    return res.status(400).json({
+      success: false,
+      message: "Both passwords are required"
+    });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({
+      success: false,
+      message: "New password must be at least 6 characters"
+    });
+  }
+
+  db.get(
+    `SELECT password FROM users WHERE id = ?`,
+    [req.user.id],
+    async (err, user) => {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: "Database error"
+        });
+      }
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found"
+        });
+      }
+
+      const valid =
+        await bcrypt.compare(
+          oldPassword,
+          user.password
+        );
+
+      if (!valid) {
+        return res.status(401).json({
+          success: false,
+          message: "Old password is incorrect"
+        });
+      }
+
+      const hashed =
+        await bcrypt.hash(
+          newPassword,
+          10
+        );
+
+      db.run(
+        `
+        UPDATE users
+        SET password = ?
+        WHERE id = ?
+        `,
+        [
+          hashed,
+          req.user.id
+        ],
+        function (updateErr) {
+          if (updateErr) {
+            return res.status(500).json({
+              success: false,
+              message: updateErr.message
+            });
+          }
+
+          res.json({
+            success: true,
+            message: "Password changed successfully"
+          });
+        }
+      );
+    }
+  );
 });
 
-/* ================= GET LOADS ================= */
-
-app.get("/api/loads", (req, res) => {
-  let q = `
-    SELECT
-      l.*,
-      u.name AS provider
-    FROM loads l
-    LEFT JOIN users u
-      ON u.id=l.user_id
-    WHERE 1=1
-  `;
-
-  const p = [];
-
-  if (req.query.from) {
-    q += " AND lower(l.from_city) LIKE ?";
-    p.push("%" + req.query.from.toLowerCase() + "%");
-  }
-
-  if (req.query.to) {
-    q += " AND lower(l.to_city) LIKE ?";
-    p.push("%" + req.query.to.toLowerCase() + "%");
-  }
-
-  if (req.query.type) {
-    q += " AND l.truck_type=?";
-    p.push(req.query.type);
-  }
-
-  q += " ORDER BY l.id DESC";
-
-  db.all(q, p, (e, rows) => {
-    res.json(rows || []);
-  });
-});
-
-/* ================= POST LOAD ================= */
+// ----------------------------------------------------
+// POST LOAD
+// ----------------------------------------------------
 
 app.post("/api/loads", auth, (req, res) => {
-  const x = req.body;
+  const {
+    from_location,
+    to_location,
+    material,
+    weight,
+    vehicle_type,
+    pickup_date,
+    price,
+    description
+  } = req.body;
 
-  if (
-    !x.from_city ||
-    !x.to_city ||
-    !x.load_date ||
-    !x.truck_type
-  ) {
+  if (!from_location || !to_location) {
     return res.status(400).json({
-      error: "Fill required load details"
+      success: false,
+      message: "From and To locations are required"
     });
   }
 
@@ -319,428 +584,272 @@ app.post("/api/loads", auth, (req, res) => {
     INSERT INTO loads
     (
       user_id,
-      from_city,
-      to_city,
-      load_date,
-      truck_type,
-      weight,
+      from_location,
+      to_location,
       material,
-      rate,
-      created_at
+      weight,
+      vehicle_type,
+      pickup_date,
+      price,
+      description,
+      status
     )
-    VALUES(?,?,?,?,?,?,?,?,datetime('now'))
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       req.user.id,
-      x.from_city,
-      x.to_city,
-      x.load_date,
-      x.truck_type,
-      x.weight || "",
-      x.material || "",
-      x.rate || ""
+      from_location.trim(),
+      to_location.trim(),
+      material || "",
+      weight || "",
+      vehicle_type || "",
+      pickup_date || "",
+      price || "",
+      description || "",
+      "available"
     ],
-    function (e) {
-      if (e) {
+    function (err) {
+      if (err) {
         return res.status(500).json({
-          error: "Could not post load"
+          success: false,
+          message: err.message
         });
       }
 
       res.json({
-        id: this.lastID,
-        message: "Load posted successfully"
+        success: true,
+        message: "Load posted successfully",
+        loadId: this.lastID
       });
     }
   );
 });
 
-/* ================= MY LOADS ================= */
+// ----------------------------------------------------
+// GET ALL LOADS
+// ----------------------------------------------------
+
+app.get("/api/loads", (req, res) => {
+  const {
+    from,
+    to,
+    vehicle_type,
+    status
+  } = req.query;
+
+  let sql = `
+    SELECT
+      loads.*,
+      users.name AS owner_name,
+      users.phone AS owner_phone
+    FROM loads
+    LEFT JOIN users
+      ON users.id = loads.user_id
+    WHERE 1 = 1
+  `;
+
+  const params = [];
+
+  if (from) {
+    sql += ` AND LOWER(loads.from_location) LIKE LOWER(?)`;
+    params.push(`%${from}%`);
+  }
+
+  if (to) {
+    sql += ` AND LOWER(loads.to_location) LIKE LOWER(?)`;
+    params.push(`%${to}%`);
+  }
+
+  if (vehicle_type) {
+    sql += ` AND LOWER(loads.vehicle_type) LIKE LOWER(?)`;
+    params.push(`%${vehicle_type}%`);
+  }
+
+  if (status) {
+    sql += ` AND loads.status = ?`;
+    params.push(status);
+  } else {
+    sql += ` AND loads.status = 'available'`;
+  }
+
+  sql += ` ORDER BY loads.id DESC`;
+
+  db.all(
+    sql,
+    params,
+    (err, rows) => {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: err.message
+        });
+      }
+
+      res.json({
+        success: true,
+        loads: rows
+      });
+    }
+  );
+});
+
+// ----------------------------------------------------
+// MY LOADS
+// ----------------------------------------------------
 
 app.get("/api/my-loads", auth, (req, res) => {
   db.all(
     `
     SELECT *
     FROM loads
-    WHERE user_id=?
+    WHERE user_id = ?
     ORDER BY id DESC
     `,
     [req.user.id],
-    (e, rows) => {
-      res.json(rows || []);
-    }
-  );
-});
-
-/* ================= TRUCKS ================= */
-
-app.post("/api/trucks", auth, (req, res) => {
-  const x = req.body;
-
-  if (!x.number || !x.type) {
-    return res.status(400).json({
-      error: "Truck number and type required"
-    });
-  }
-
-  db.run(
-    `
-    INSERT INTO trucks
-    (user_id,number,type,capacity)
-    VALUES(?,?,?,?)
-    `,
-    [
-      req.user.id,
-      x.number,
-      x.type,
-      x.capacity || ""
-    ],
-    function (e) {
-      if (e) {
+    (err, rows) => {
+      if (err) {
         return res.status(500).json({
-          error: "Could not add truck"
+          success: false,
+          message: err.message
         });
       }
 
       res.json({
-        id: this.lastID,
-        message: "Truck added"
+        success: true,
+        loads: rows
       });
     }
   );
 });
 
-app.get("/api/trucks", auth, (req, res) => {
-  db.all(
-    `
-    SELECT *
-    FROM trucks
-    WHERE user_id=?
-    ORDER BY id DESC
-    `,
-    [req.user.id],
-    (e, rows) => {
-      res.json(rows || []);
-    }
-  );
-});
+// ----------------------------------------------------
+// GET SINGLE LOAD
+// ----------------------------------------------------
 
-app.delete("/api/trucks/:id", auth, (req, res) => {
-  db.run(
+app.get("/api/loads/:id", (req, res) => {
+  db.get(
     `
-    DELETE FROM trucks
-    WHERE id=? AND user_id=?
+    SELECT
+      loads.*,
+      users.name AS owner_name,
+      users.email AS owner_email,
+      users.phone AS owner_phone
+    FROM loads
+    LEFT JOIN users
+      ON users.id = loads.user_id
+    WHERE loads.id = ?
     `,
-    [
-      req.params.id,
-      req.user.id
-    ],
-    () => {
+    [req.params.id],
+    (err, load) => {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: err.message
+        });
+      }
+
+      if (!load) {
+        return res.status(404).json({
+          success: false,
+          message: "Load not found"
+        });
+      }
+
       res.json({
-        message: "Deleted"
+        success: true,
+        load
       });
     }
   );
 });
 
-/* ================= APPLY FOR LOAD ================= */
+// ----------------------------------------------------
+// UPDATE LOAD
+// ----------------------------------------------------
 
-app.post("/api/loads/:id/apply", auth, (req, res) => {
-  const loadId = req.params.id;
-  const truckId = req.body.truck_id;
-
-  if (!truckId) {
-    return res.status(400).json({
-      error: "Select a truck"
-    });
-  }
-
+app.put("/api/loads/:id", auth, (req, res) => {
   db.get(
     `
     SELECT *
     FROM loads
-    WHERE id=?
-    `,
-    [loadId],
-    (err, load) => {
-      if (err || !load) {
-        return res.status(404).json({
-          error: "Load not found"
-        });
-      }
-
-      if (load.status !== "Open") {
-        return res.status(400).json({
-          error: "This load is not open"
-        });
-      }
-
-      if (Number(load.user_id) === Number(req.user.id)) {
-        return res.status(400).json({
-          error: "You cannot apply to your own load"
-        });
-      }
-
-      db.get(
-        `
-        SELECT *
-        FROM trucks
-        WHERE id=? AND user_id=?
-        `,
-        [
-          truckId,
-          req.user.id
-        ],
-        (err2, truck) => {
-          if (err2 || !truck) {
-            return res.status(400).json({
-              error: "Truck not found in your account"
-            });
-          }
-
-          db.get(
-            `
-            SELECT *
-            FROM applications
-            WHERE load_id=?
-            AND applicant_id=?
-            `,
-            [
-              loadId,
-              req.user.id
-            ],
-            (err3, existing) => {
-              if (existing) {
-                return res.status(400).json({
-                  error: "You already applied for this load"
-                });
-              }
-
-              db.run(
-                `
-                INSERT INTO applications
-                (
-                  load_id,
-                  applicant_id,
-                  truck_id,
-                  created_at
-                )
-                VALUES(?,?,?,datetime('now'))
-                `,
-                [
-                  loadId,
-                  req.user.id,
-                  truckId
-                ],
-                function (e) {
-                  if (e) {
-                    return res.status(500).json({
-                      error: "Could not submit application"
-                    });
-                  }
-
-                  res.json({
-                    id: this.lastID,
-                    message: "Application submitted successfully"
-                  });
-                }
-              );
-            }
-          );
-        }
-      );
-    }
-  );
-});
-
-/* ================= MY APPLICATIONS ================= */
-
-app.get("/api/my-applications", auth, (req, res) => {
-  db.all(
-    `
-    SELECT
-      a.*,
-      l.from_city,
-      l.to_city,
-      l.load_date,
-      l.truck_type,
-      l.rate,
-      l.status AS load_status,
-      t.number AS truck_number,
-      t.type AS truck_type_real,
-      t.capacity
-    FROM applications a
-    JOIN loads l
-      ON l.id=a.load_id
-    JOIN trucks t
-      ON t.id=a.truck_id
-    WHERE a.applicant_id=?
-    ORDER BY a.id DESC
-    `,
-    [req.user.id],
-    (e, rows) => {
-      res.json(rows || []);
-    }
-  );
-});
-
-/* ================= LOAD OWNER APPLICATIONS ================= */
-
-app.get("/api/my-load-applications", auth, (req, res) => {
-  db.all(
-    `
-    SELECT
-      a.*,
-      l.from_city,
-      l.to_city,
-      l.load_date,
-      l.truck_type,
-      l.rate,
-      l.status AS load_status,
-      u.name AS applicant_name,
-      u.email AS applicant_email,
-      t.number AS truck_number,
-      t.type AS truck_type_real,
-      t.capacity
-    FROM applications a
-    JOIN loads l
-      ON l.id=a.load_id
-    JOIN users u
-      ON u.id=a.applicant_id
-    JOIN trucks t
-      ON t.id=a.truck_id
-    WHERE l.user_id=?
-    ORDER BY a.id DESC
-    `,
-    [req.user.id],
-    (e, rows) => {
-      res.json(rows || []);
-    }
-  );
-});
-
-/* ================= ACCEPT APPLICATION ================= */
-
-app.post("/api/applications/:id/accept", auth, (req, res) => {
-  const id = req.params.id;
-
-  db.get(
-    `
-    SELECT
-      a.*,
-      l.user_id AS owner_id,
-      l.id AS load_id,
-      l.status AS load_status
-    FROM applications a
-    JOIN loads l
-      ON l.id=a.load_id
-    WHERE a.id=?
-    `,
-    [id],
-    (err, application) => {
-      if (err || !application) {
-        return res.status(404).json({
-          error: "Application not found"
-        });
-      }
-
-      if (Number(application.owner_id) !== Number(req.user.id)) {
-        return res.status(403).json({
-          error: "Not allowed"
-        });
-      }
-
-      if (application.status !== "Pending") {
-        return res.status(400).json({
-          error: "Application is already processed"
-        });
-      }
-
-      if (application.load_status !== "Open") {
-        return res.status(400).json({
-          error: "Load is no longer open"
-        });
-      }
-
-      db.serialize(() => {
-        db.run(
-          `
-          UPDATE applications
-          SET status='Accepted'
-          WHERE id=?
-          `,
-          [id]
-        );
-
-        db.run(
-          `
-          UPDATE loads
-          SET status='Assigned'
-          WHERE id=?
-          `,
-          [application.load_id]
-        );
-
-        db.run(
-          `
-          UPDATE applications
-          SET status='Rejected'
-          WHERE load_id=?
-          AND id<>?
-          AND status='Pending'
-          `,
-          [
-            application.load_id,
-            id
-          ],
-          () => {
-            res.json({
-              message: "Application accepted"
-            });
-          }
-        );
-      });
-    }
-  );
-});
-
-/* ================= REJECT APPLICATION ================= */
-
-app.post("/api/applications/:id/reject", auth, (req, res) => {
-  db.get(
-    `
-    SELECT
-      a.*,
-      l.user_id AS owner_id
-    FROM applications a
-    JOIN loads l
-      ON l.id=a.load_id
-    WHERE a.id=?
+    WHERE id = ?
     `,
     [req.params.id],
-    (err, application) => {
-      if (err || !application) {
-        return res.status(404).json({
-          error: "Application not found"
+    (err, load) => {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: err.message
         });
       }
 
-      if (Number(application.owner_id) !== Number(req.user.id)) {
-        return res.status(403).json({
-          error: "Not allowed"
+      if (!load) {
+        return res.status(404).json({
+          success: false,
+          message: "Load not found"
         });
       }
+
+      if (
+        load.user_id !== req.user.id &&
+        req.user.role !== "admin"
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "Not authorized"
+        });
+      }
+
+      const {
+        from_location,
+        to_location,
+        material,
+        weight,
+        vehicle_type,
+        pickup_date,
+        price,
+        description,
+        status
+      } = req.body;
 
       db.run(
         `
-        UPDATE applications
-        SET status='Rejected'
-        WHERE id=?
+        UPDATE loads
+        SET
+          from_location = ?,
+          to_location = ?,
+          material = ?,
+          weight = ?,
+          vehicle_type = ?,
+          pickup_date = ?,
+          price = ?,
+          description = ?,
+          status = ?
+        WHERE id = ?
         `,
-        [req.params.id],
-        () => {
+        [
+          from_location ?? load.from_location,
+          to_location ?? load.to_location,
+          material ?? load.material,
+          weight ?? load.weight,
+          vehicle_type ?? load.vehicle_type,
+          pickup_date ?? load.pickup_date,
+          price ?? load.price,
+          description ?? load.description,
+          status ?? load.status,
+          req.params.id
+        ],
+        function (updateErr) {
+          if (updateErr) {
+            return res.status(500).json({
+              success: false,
+              message: updateErr.message
+            });
+          }
+
           res.json({
-            message: "Application rejected"
+            success: true,
+            message: "Load updated successfully"
           });
         }
       );
@@ -748,282 +857,116 @@ app.post("/api/applications/:id/reject", auth, (req, res) => {
   );
 });
 
-/* ================= STATS ================= */
+// ----------------------------------------------------
+// DELETE LOAD
+// ----------------------------------------------------
 
-app.get("/api/stats", auth, (req, res) => {
+app.delete("/api/loads/:id", auth, (req, res) => {
   db.get(
     `
-    SELECT count(*) n
+    SELECT user_id
     FROM loads
-    WHERE user_id=?
+    WHERE id = ?
     `,
-    [req.user.id],
-    (e, a) => {
-      db.get(
-        `
-        SELECT count(*) n
-        FROM trucks
-        WHERE user_id=?
-        `,
-        [req.user.id],
-        (e, b) => {
-          db.get(
-            `
-            SELECT count(*) n
-            FROM loads
-            WHERE status='Open'
-            `,
-            (e, c) => {
-              db.get(
-                `
-                SELECT count(*) n
-                FROM applications
-                WHERE applicant_id=?
-                `,
-                [req.user.id],
-                (e, d) => {
-                  res.json({
-                    myLoads: a?.n || 0,
-                    trucks: b?.n || 0,
-                    openLoads: c?.n || 0,
-                    applications: d?.n || 0
-                  });
-                }
-              );
-            }
-          );
+    [req.params.id],
+    (err, load) => {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: err.message
+        });
+      }
+
+      if (!load) {
+        return res.status(404).json({
+          success: false,
+          message: "Load not found"
+        });
+      }
+
+      if (
+        load.user_id !== req.user.id &&
+        req.user.role !== "admin"
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "Not authorized"
+        });
+      }
+
+      db.run(
+        `DELETE FROM loads WHERE id = ?`,
+        [req.params.id],
+        function (deleteErr) {
+          if (deleteErr) {
+            return res.status(500).json({
+              success: false,
+              message: deleteErr.message
+            });
+          }
+
+          res.json({
+            success: true,
+            message: "Load deleted successfully"
+          });
         }
       );
     }
   );
 });
 
-/* =====================================================
-   ADMIN APIs
-   ===================================================== */
+// ----------------------------------------------------
+// ADD TRUCK
+// ----------------------------------------------------
 
-/* ================= ADMIN STATS ================= */
+app.post("/api/trucks", auth, (req, res) => {
+  const {
+    truck_number,
+    truck_type,
+    capacity,
+    driver_name,
+    driver_phone,
+    status
+  } = req.body;
 
-app.get("/api/admin/stats", adminAuth, (req, res) => {
-  db.get(
-    "SELECT count(*) n FROM users",
-    (e, users) => {
-      db.get(
-        "SELECT count(*) n FROM loads",
-        (e, loads) => {
-          db.get(
-            "SELECT count(*) n FROM trucks",
-            (e, trucks) => {
-              db.get(
-                "SELECT count(*) n FROM applications",
-                (e, applications) => {
-                  res.json({
-                    users: users?.n || 0,
-                    loads: loads?.n || 0,
-                    trucks: trucks?.n || 0,
-                    applications: applications?.n || 0
-                  });
-                }
-              );
-            }
-          );
-        }
-      );
-    }
-  );
-});
+  if (!truck_number) {
+    return res.status(400).json({
+      success: false,
+      message: "Truck number is required"
+    });
+  }
 
-/* ================= ADMIN USERS ================= */
-
-app.get("/api/admin/users", adminAuth, (req, res) => {
-  db.all(
+  db.run(
     `
-    SELECT
-      id,
-      name,
-      email,
-      role,
-      created_at
-    FROM users
-    ORDER BY id DESC
+    INSERT INTO trucks
+    (
+      user_id,
+      truck_number,
+      truck_type,
+      capacity,
+      driver_name,
+      driver_phone,
+      status
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
     `,
-    [],
-    (e, rows) => {
-      res.json(rows || []);
-    }
-  );
-});
-
-/* ================= ADMIN LOADS ================= */
-
-app.get("/api/admin/loads", adminAuth, (req, res) => {
-  db.all(
-    `
-    SELECT
-      l.*,
-      u.name AS provider,
-      u.email AS provider_email
-    FROM loads l
-    LEFT JOIN users u
-      ON u.id=l.user_id
-    ORDER BY l.id DESC
-    `,
-    [],
-    (e, rows) => {
-      res.json(rows || []);
-    }
-  );
-});
-
-/* ================= ADMIN TRUCKS ================= */
-
-app.get("/api/admin/trucks", adminAuth, (req, res) => {
-  db.all(
-    `
-    SELECT
-      t.*,
-      u.name AS owner,
-      u.email AS owner_email
-    FROM trucks t
-    LEFT JOIN users u
-      ON u.id=t.user_id
-    ORDER BY t.id DESC
-    `,
-    [],
-    (e, rows) => {
-      res.json(rows || []);
-    }
-  );
-});
-
-/* ================= ADMIN APPLICATIONS ================= */
-
-app.get("/api/admin/applications", adminAuth, (req, res) => {
-  db.all(
-    `
-    SELECT
-      a.*,
-      l.from_city,
-      l.to_city,
-      l.load_date,
-      l.rate,
-      l.status AS load_status,
-      owner.name AS owner_name,
-      applicant.name AS applicant_name,
-      applicant.email AS applicant_email,
-      t.number AS truck_number,
-      t.type AS truck_type,
-      t.capacity
-    FROM applications a
-    JOIN loads l
-      ON l.id=a.load_id
-    LEFT JOIN users owner
-      ON owner.id=l.user_id
-    LEFT JOIN users applicant
-      ON applicant.id=a.applicant_id
-    LEFT JOIN trucks t
-      ON t.id=a.truck_id
-    ORDER BY a.id DESC
-    `,
-    [],
-    (e, rows) => {
-      res.json(rows || []);
-    }
-  );
-});
-
-/* ================= ADMIN DELETE USER ================= */
-
-app.delete("/api/admin/users/:id", adminAuth, (req, res) => {
-  const id = req.params.id;
-
-  db.serialize(() => {
-    db.run(
-      `
-      DELETE FROM applications
-      WHERE applicant_id=?
-      `,
-      [id]
-    );
-
-    db.run(
-      `
-      DELETE FROM applications
-      WHERE load_id IN
-      (
-        SELECT id FROM loads WHERE user_id=?
-      )
-      `,
-      [id]
-    );
-
-    db.run(
-      `
-      DELETE FROM trucks
-      WHERE user_id=?
-      `,
-      [id]
-    );
-
-    db.run(
-      `
-      DELETE FROM loads
-      WHERE user_id=?
-      `,
-      [id]
-    );
-
-    db.run(
-      `
-      DELETE FROM users
-      WHERE id=?
-      `,
-      [id],
-      () => {
-        res.json({
-          message: "User deleted"
+    [
+      req.user.id,
+      truck_number.trim(),
+      truck_type || "",
+      capacity || "",
+      driver_name || "",
+      driver_phone || "",
+      status || "Available"
+    ],
+    function (err) {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: err.message
         });
       }
-    );
-  });
-});
 
-/* ================= ADMIN DELETE LOAD ================= */
-
-app.delete("/api/admin/loads/:id", adminAuth, (req, res) => {
-  const id = req.params.id;
-
-  db.serialize(() => {
-    db.run(
-      `
-      DELETE FROM applications
-      WHERE load_id=?
-      `,
-      [id]
-    );
-
-    db.run(
-      `
-      DELETE FROM loads
-      WHERE id=?
-      `,
-      [id],
-      () => {
-        res.json({
-          message: "Load deleted"
-        });
-      }
-    );
-  });
-});
-
-/* ================= ADMIN DELETE TRUCK ================= */
-
-app.delete("/api/admin/trucks/:id", adminAuth, (req, res) => {
-  const id = req.params.id;
-
-  db.serialize(() => {
-    db.run(
-      `
-      DELETE FROM applications
-      WHERE truc
+      res.json({
+        success: true,
+        message: "Truck added successfully"
