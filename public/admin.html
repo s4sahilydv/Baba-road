@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="UTF-8">
+
+<meta
+  name="viewport"
+  content="width=device-width,initial-scale=1"
+>
+
+<title>BRC Admin Panel</title>
+
+<style>
+
+*{
+  box-sizing:border-box
+}
+
+body{
+  margin:0;
+  font-family:Arial,sans-serif;
+  background:#f4f7fb;
+  color:#172033
+}
+
+header{
+  background:#0b3d91;
+  color:white;
+  padding:18px 6%;
+  display:flex;
+  justify-content:space-between;
+  align-items:center
+}
+
+.logo{
+  font-size:23px;
+  font-weight:bold
+}
+
+button{
+  border:0;
+  padding:10px 15px;
+  border-radius:8px;
+  cursor:pointer
+}
+
+.primary{
+  background:#0b3d91;
+  color:white
+}
+
+.danger{
+  background:#ffe5e5;
+  color:#b00020
+}
+
+.hidden{
+  display:none!important
+}
+
+main{
+  max-width:1200px;
+  margin:30px auto;
+  padding:0 18px
+}
+
+.hero{
+  background:#0b3d91;
+  color:white;
+  border-radius:18px;
+  padding:30px;
+  margin-bottom:20px
+}
+
+.card{
+  background:white;
+  padding:20px;
+  border-radius:14px;
+  margin-bottom:20px;
+  box-shadow:0 4px 18px #00000012
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:
+    repeat(auto-fit,minmax(200px,1fr));
+  gap:15px
+}
+
+.stat{
+  background:white;
+  padding:20px;
+  border-radius:12px;
+  text-align:center
+}
+
+.stat b{
+  display:block;
+  font-size:30px;
+  color:#0b3d91
+}
+
+input{
+  width:100%;
+  padding:12px;
+  border:1px solid #ccd4e0;
+  border-radius:8px;
+  margin-bottom:12px
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  min-width:700px
+}
+
+th,td{
+  padding:12px;
+  border-bottom:1px solid #e5e8ee;
+  text-align:left
+}
+
+.tableWrap{
+  overflow:auto
+}
+
+.tabs{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-bottom:20px
+}
+
+.tabs button{
+  background:#e8eef9;
+  color:#0b3d91
+}
+
+.tabs button.active{
+  background:#0b3d91;
+  color:white
+}
+
+.msg{
+  padding:10px;
+  margin-top:10px;
+  border-radius:8px;
+  background:#eef6ff
+}
+
+</style>
+
+</head>
+
+<body>
+
+<header>
+
+<div class="logo">
+🚚 BRC Admin Panel
+</div>
+
+<button
+  id="logout"
+  class="hidden"
+  onclick="logout()"
+>
+Logout
+</button>
+
+</header>
+
+
+<main>
+
+
+<!-- LOGIN -->
+
+<section id="loginBox">
+
+<div class="hero">
+
+<h1>Admin Login</h1>
+
+<p>
+Bharat Road Connect administration
+</p>
+
+</div>
+
+
+<div class="card">
+
+<input
+  id="email"
+  type="email"
+  placeholder="Admin email"
+>
+
+<input
+  id="password"
+  type="password"
+  placeholder="Admin password"
+>
+
+<button
+  class="primary"
+  onclick="login()"
+>
+Login
+</button>
+
+<div id="loginMsg"></div>
+
+</div>
+
+</section>
+
+
+<!-- DASHBOARD -->
+
+<section id="dashboard" class="hidden">
+
+
+<div class="hero">
+
+<h1>
+Welcome, Admin 👋
+</h1>
+
+<p>
+Manage your BRC platform
+</p>
+
+</div>
+
+
+<div class="grid">
+
+<div class="stat">
+
+<b id="usersCount">
+0
+</b>
+
+Users
+
+</div>
+
+
+<div class="stat">
+
+<b id="loadsCount">
+0
+</b>
+
+Loads
+
+</div>
+
+
+<div class="stat">
+
+<b id="trucksCount">
+0
+</b>
+
+Trucks
+
+</div>
+
+
+<div class="stat">
+
+<b id="appsCount">
+0
+</b>
+
+Applications
+
+</div>
+
+</div>
+
+
+<div class="card">
+
+<div class="tabs">
+
+<button
+  class="active"
+  onclick="showTab('users',this)"
+>
+Users
+</button>
+
+<button
+  onclick="showTab('loads',this)"
+>
+Loads
+</button>
+
+<button
+  onclick="showTab('trucks',this)"
+>
+Trucks
+</button>
+
+<button
+  onclick="showTab('apps',this)"
+>
+Applications
+</button>
+
+</div>
+
+
+<!-- USERS -->
+
+<div id="usersTab">
+
+<h2>Users</h2>
+
+<div class="tableWrap">
+
+<table>
+
+<thead>
+
+<tr>
+<th>ID</th>
+<th>Name</th>
+<th>Email</th>
+<th>Role</th>
+<th>Action</th>
+</tr>
+
+</thead>
+
+<tbody id="usersBody"></tbody>
+
+</table>
+
+</div>
+
+</div>
+
+
+<!-- LOADS -->
+
+<div
+  id="loadsTab"
+  class="hidden"
+>
+
+<h2>Loads</h2>
+
+<div class="tableWrap">
+
+<table>
+
+<thead>
+
+<tr>
+<th>ID</th>
+<th>Route</th>
+<th>Date</th>
+<th>Truck</th>
+<th>Rate</th>
+<th>Status</th>
+<th>Owner</th>
+<th>Action</th>
+</tr>
+
+</thead>
+
+<tbody id="loadsBody"></tbody>
+
+</table>
+
+</div>
+
+</div>
+
+
+<!-- TRUCKS -->
+
+<div
+  id="trucksTab"
+  class="hidden"
+>
+
+<h2>Trucks</h2>
+
+<div class="tableWrap">
+
+<table>
+
+<thead>
+
+<tr>
+<th>ID</th>
+<th>Number</th>
+<th>Type</th>
+<th>Capacity</th>
+<th>Owner</th>
+<th>Action</th>
+</tr>
+
+</thead>
+
+<tbody id="trucksBody"></tbody>
+
+</table>
+
+</div>
+
+</div>
+
+
+<!-- APPLICATIONS -->
+
+<div
+  id="appsTab"
+  class="hidden"
+>
+
+<h2>Applications</h2>
+
+<div class="tableWrap">
+
+<table>
+
+<thead>
+
+<tr>
+<th>ID</th>
+<th>Load</th>
+<th>Applicant</th>
+<th>Email</th>
+<th>Truck</th>
+<th>Status</th>
+</tr>
+
+</thead>
+
+<tbody id="appsBody"></tbody>
+
+</table>
+
+</div>
+
+</div>
+
+
+</div>
+
+</div>
+
+</section>
+
+</main>
+
+
+<script>
+
+let token =
+  localStorage.getItem(
+    "brc_admin_token"
+  );
+
+
+async function api(
+  url,
+  options={}
+){
+
+  options.headers = {
+    ...(options.headers || {}),
+    "Content-Type":
+      "application/json"
+  };
+
+  if(token){
+
+    options.headers.Authorization =
+      "Bearer " + token;
+
+  }
+
+  const r =
+    await fetch(
+      url,
+      options
+    );
+
+  const data =
+    await r
+      .json()
+      .catch(
+        ()=>({})
+      );
+
+  if(!r.ok){
+
+    throw new Error(
+      data.error ||
+      "Something went wrong"
+    );
+
+  }
+
+  return data;
+
+}
+
+
+async function login(){
+
+  try{
+
+    const data =
+      await api(
+        "/api/admin/login",
+        {
+          method:"POST",
+
+          body:
+            JSON.stringify({
+
+              email:
+                email.value,
+
+              password:
+                password.value
+
+            })
+        }
+      );
+
+    token =
+      data.token;
+
+    localStorage.setItem(
+      "brc_admin_token",
+      token
+    );
+
+    openDashboard();
+
+  }
+
+  catch(e){
+
+    loginMsg.innerHTML =
+      '<div class="msg">' +
+      e.message +
+      '</div>';
+
+  }
+
+}
+
+
+function openDashboard(){
+
+  loginBox
+    .classList
+    .add("hidden");
+
+  dashboard
+    .classList
+    .remove("hidden");
+
+  logout
+    .classList
+    .remove("hidden");
+
+  loadStats();
+  loadUsers();
+  loadLoads();
+  loadTrucks();
+  loadApps();
+
+}
+
+
+async function loadStats(){
+
+  const s =
+    await api(
+      "/api/admin/stats"
+    );
+
+  usersCount.textContent =
+    s.users;
+
+  loadsCount.textContent =
+    s.loads;
+
+  trucksCount.textContent =
+    s.trucks;
+
+  appsCount.textContent =
+    s.applications;
+
+}
+
+
+function showTab(
+  name,
+  btn
+){
+
+  [
+    "users",
+    "loads",
+    "trucks",
+    "apps"
+  ]
+  .forEach(
+    x =>
+      document
+        .getElementById(
+          x + "Tab"
+        )
+        .classList
+        .add("hidden")
+  );
+
+  document
+    .getElementById(
+      name + "Tab"
+    )
+    .classList
+    .remove("hidden");
+
+  document
+    .querySelectorAll(
+      ".tabs button"
+    )
+    .forEach(
+      b =>
+        b.classList
+         .remove("active")
+    );
+
+  btn.classList.add("active");
+
+}
+
+
+async function loadUsers(){
+
+  const rows =
+    await api(
+      "/api/admin/users"
+    );
+
+  usersBody.innerHTML =
+    rows.map(
+      u => `
+
+      <tr>
+
+        <td>${u.id}</td>
+
+        <td>${safe(u.name)}</td>
+
+        <td>${safe(u.email)}</td>
+
+        <td>${safe(u.role)}</td>
+
+        <td>
+
+          <button
+            class="danger"
+            onclick="deleteUser(${u.id})"
+          >
+            Delete
+          </button>
+
+        </td>
+
+      </tr>
+
+      `
+    ).join("");
+
+}
+
+
+async function loadLoads(){
+
+  const rows =
+    await api(
+      "/api/admin/loads"
+    );
+
+  loadsBody.innerHTML =
+    rows.map(
+      l => `
+
+      <tr>
+
+        <td>${l.id}</td>
+
+        <td>
+          ${safe(l.from_city)}
+          →
+          ${safe(l.to_city)}
+        </td>
+
+        <td>${safe(l.load_date)}</td>
+
+        <td>${safe(l.truck_type)}</td>
+
+        <td>${safe(l.rate)}</td>
+
+        <td>${safe(l.status)}</td>
+
+        <td>${safe(l.provider)}</td>
+
+        <td>
+
+          <button
+            class="danger"
+            onclick="deleteLoad(${l.id})"
+          >
+            Delete
+          </button>
+
+        </td>
+
+      </tr>
+
+      `
+    ).join("");
+
+}
+
+
+async function loadTrucks(){
+
+  const rows =
+    await api(
+      "/api/admin/trucks"
+    );
+
+  trucksBody.innerHTML =
+    rows.map(
+      t => `
+
+      <tr>
+
+        <td>${t.id}</td>
+
+        <td>${safe(t.number)}</td>
+
+        <td>${safe(t.type)}</td>
+
+        <td>${safe(t.capacity)}</td>
+
+        <td>${safe(t.owner)}</td>
+
+        <td>
+
+          <button
+            class="danger"
+            onclick="deleteTruck(${t.id})"
+          >
+            Delete
+          </button>
+
+        </td>
+
+      </tr>
+
+      `
+    ).join("");
+
+}
+
+
+async function loadApps(){
+
+  const rows =
+    await api(
+      "/api/admin/applications"
+    );
+
+  appsBody.innerHTML =
+    rows.map(
+      a => `
+
+      <tr>
+
+        <td>${a.id}</td>
+
+        <td>
+          ${safe(a.from_city)}
+          →
+          ${safe(a.to_city)}
+        </td>
+
+        <td>
+          ${safe(a.applicant_name)}
+        </td>
+
+        <td>
+          ${safe(a.applicant_email)}
+        </td>
+
+        <td>
+          ${safe(a.truck_number)}
+        </td>
+
+        <td>
+          ${safe(a.status)}
+        </td>
+
+      </tr>
+
+      `
+    ).join("");
+
+}
+
+
+async function deleteUser(id){
+
+  if(
+    !confirm(
+      "Delete this user?"
+    )
+  ) return;
+
+  await api(
+    "/api/admin/users/" + id,
+    {
+      method:"DELETE"
+    }
+  );
+
+  loadStats();
+  loadUsers();
+  loadLoads();
+  loadTrucks();
+  loadApps();
+
+}
+
+
+async function deleteLoad(id){
+
+  if(
+    !confirm(
+      "Delete this load?"
+    )
+  ) return;
+
+  await api(
+    "/api/admin/loads/" + id,
+    {
+      method:"DELETE"
+    }
+  );
+
+  loadStats();
+  loadLoads();
+  loadApps();
+
+}
+
+
+async function deleteTruck(id){
+
+  if(
+    !confirm(
+      "Delete this truck?"
+    )
+  ) return;
+
+  await api(
+    "/api/admin/trucks/" + id,
+    {
+      method:"DELETE"
+    }
+  );
+
+  loadStats();
+  loadTrucks();
+  loadApps();
+
+}
+
+
+function logout(){
+
+  localStorage.removeItem(
+    "brc_admin_token"
+  );
+
+  location.reload();
+
+}
+
+
+function safe(v){
+
+  return String(
+    v ?? ""
+  )
+  .replace(
+    /[&<>"']/g,
+    m => ({
+      "&":"&amp;",
+      "<":"&lt;",
+      ">":"&gt;",
+      '"':"&quot;",
+      "'":"&#039;"
+    }[m])
+  );
+
+}
+
+
+if(token){
+
+  openDashboard();
+
+}
+
+</script>
+
+</body>
+</html>
