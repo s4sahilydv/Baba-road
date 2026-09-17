@@ -971,3 +971,14 @@ app.post("/api/trucks", auth, (req, res) => {
         success: true,
         message: "Truck added successfully"
       });
+    }
+  );
+});
+
+// ----------------------------------------------------
+// START SERVER
+// ----------------------------------------------------
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`BRC server running on port ${PORT}`);
+});
