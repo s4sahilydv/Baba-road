@@ -970,3 +970,4 @@ app.post("/api/trucks", auth, (req, res) => {
       res.json({
         success: true,
         message: "Truck added successfully"
+      });
