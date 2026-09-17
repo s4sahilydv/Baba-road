@@ -1,10 +1,1368 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Baba Road Carrier</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bharat Road Connect</title>
+
+  <style>
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      font-family:Arial,sans-serif;
+      background:#f4f7fb;
+      color:#172033
+    }
+
+    header{
+      background:#0b3d91;
+      color:#fff;
+      padding:18px 6%;
+      display:flex;
+      justify-content:space-between;
+      align-items:center
+    }
+
+    .logo{
+      font-size:24px;
+      font-weight:700
+    }
+
+    header button{
+      background:#fff;
+      color:#0b3d91;
+      border:0;
+      border-radius:8px;
+      padding:10px 16px;
+      cursor:pointer
+    }
+
+    main{
+      max-width:1100px;
+      margin:30px auto;
+      padding:0 18px
+    }
+
+    .hero{
+      background:#0b3d91;
+      color:white;
+      border-radius:18px;
+      padding:35px;
+      margin-bottom:24px
+    }
+
+    .hero h1{
+      margin:0 0 10px;
+      font-size:34px
+    }
+
+    .hero p{
+      margin:0 0 20px
+    }
+
+    .card{
+      background:#fff;
+      border-radius:14px;
+      padding:22px;
+      margin-bottom:20px;
+      box-shadow:0 4px 18px #00000012
+    }
+
+    .tabs{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-bottom:18px
+    }
+
+    .tabs button{
+      border:0;
+      padding:11px 16px;
+      border-radius:8px;
+      cursor:pointer;
+      background:#e8eef9
+    }
+
+    .tabs button.active{
+      background:#0b3d91;
+      color:#fff
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+      gap:14px
+    }
+
+    input,select{
+      width:100%;
+      padding:12px;
+      border:1px solid #ccd4e0;
+      border-radius:8px;
+      font-size:15px
+    }
+
+    label{
+      font-size:13px;
+      font-weight:600;
+      display:block;
+      margin-bottom:6px
+    }
+
+    .field{
+      margin-bottom:12px
+    }
+
+    .primary{
+      background:#0b3d91;
+      color:#fff;
+      border:0;
+      padding:12px 18px;
+      border-radius:8px;
+      cursor:pointer
+    }
+
+    .secondary{
+      background:#e8eef9;
+      color:#0b3d91;
+      border:0;
+      padding:12px 18px;
+      border-radius:8px;
+      cursor:pointer
+    }
+
+    .hidden{
+      display:none!important
+    }
+
+    .msg{
+      margin-top:12px;
+      padding:10px;
+      border-radius:8px;
+      background:#eef6ff
+    }
+
+    .stats{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:14px
+    }
+
+    .stat{
+      background:#fff;
+      padding:20px;
+      border-radius:12px;
+      text-align:center;
+      box-shadow:0 4px 15px #0000000d
+    }
+
+    .stat b{
+      display:block;
+      font-size:28px;
+      color:#0b3d91
+    }
+
+    .load{
+      border:1px solid #e0e5ed;
+      padding:15px;
+      border-radius:10px;
+      margin-top:10px
+    }
+
+    .load strong{
+      color:#0b3d91
+    }
+
+    .top-actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap
+    }
+
+    @media(max-width:600px){
+      .stats{
+        grid-template-columns:1fr
+      }
+
+      .hero h1{
+        font-size:27px
+      }
+    }
+  </style>
 </head>
+
 <body>
-  <h1>Baba Road Carrier</h1>
-  <p>Website is live!</p>
+
+<header>
+  <div class="logo">🚚 Bharat Road Connect</div>
+  <button id="logoutBtn" class="hidden" onclick="logout()">Logout</button>
+</header>
+
+<main>
+
+  <!-- LOGIN / REGISTER -->
+  <section id="authSection">
+
+    <div class="hero">
+      <h1>Connect Loads & Trucks</h1>
+      <p>Find loads, post loads and manage your trucks in one place.</p>
+    </div>
+
+    <div class="card">
+
+      <div class="tabs">
+        <button id="loginTab" class="active" onclick="showAuth('login')">
+          Login
+        </button>
+
+        <button id="registerTab" onclick="showAuth('register')">
+          Register
+        </button>
+      </div>
+
+      <!-- LOGIN -->
+      <form id="loginForm" onsubmit="login(event)">
+
+        <div class="field">
+          <label>Email</label>
+          <input id="loginEmail" type="email" required>
+        </div>
+
+        <div class="field">
+          <label>Password</label>
+          <input id="loginPassword" type="password" required>
+        </div>
+
+        <button class="primary">Login</button>
+
+      </form>
+
+      <!-- REGISTER -->
+      <form id="registerForm" class="hidden" onsubmit="register(event)">
+
+        <div class="field">
+          <label>Name</label>
+          <input id="regName" required>
+        </div>
+
+        <div class="field">
+          <label>Email</label>
+          <input id="regEmail" type="email" required>
+        </div>
+
+        <div class="field">
+          <label>Password</label>
+          <input id="regPassword" type="password" required>
+        </div>
+
+        <div class="field">
+          <label>Role</label>
+
+          <select id="regRole">
+            <option>Transporter</option>
+            <option>Shipper</option>
+          </select>
+
+        </div>
+
+        <button class="primary">Create Account</button>
+
+      </form>
+
+      <div id="authMsg"></div>
+
+    </div>
+
+  </section>
+
+
+  <!-- MAIN APP -->
+  <section id="appSection" class="hidden">
+
+    <div class="hero">
+
+      <h1>
+        Welcome,
+        <span id="userName"></span>
+        👋
+      </h1>
+
+      <p>
+        Manage your loads and trucks from your dashboard.
+      </p>
+
+    </div>
+
+
+    <!-- STATS -->
+    <div class="stats">
+
+      <div class="stat">
+        <b id="myLoads">0</b>
+        My Loads
+      </div>
+
+      <div class="stat">
+        <b id="truckCount">0</b>
+        My Trucks
+      </div>
+
+      <div class="stat">
+        <b id="openLoads">0</b>
+        Open Loads
+      </div>
+
+    </div>
+
+
+    <div class="card">
+
+      <!-- TABS -->
+      <div class="tabs">
+
+        <button class="active" onclick="tab('find',this)">
+          Find Loads
+        </button>
+
+        <button onclick="tab('post',this)">
+          Post Load
+        </button>
+
+        <button onclick="tab('trucks',this)">
+          My Trucks
+        </button>
+
+        <button onclick="tab('myloads',this)">
+          My Loads
+        </button>
+
+      </div>
+
+
+      <!-- FIND LOADS -->
+      <div id="find">
+
+        <h2>Find Loads</h2>
+
+        <div class="grid">
+
+          <div class="field">
+            <label>From</label>
+            <input
+              id="searchFrom"
+              placeholder="e.g. Jaipur"
+            >
+          </div>
+
+          <div class="field">
+            <label>To</label>
+            <input
+              id="searchTo"
+              placeholder="e.g. Delhi"
+            >
+          </div>
+
+          <div class="field">
+
+            <label>Truck Type</label>
+
+            <select id="searchType">
+
+              <option value="">
+                All Types
+              </option>
+
+              <option>
+                Open Body
+              </option>
+
+              <option>
+                Container
+              </option>
+
+              <option>
+                Trailer
+              </option>
+
+              <option>
+                LCV
+              </option>
+
+              <option>
+                Pickup
+              </option>
+
+            </select>
+
+          </div>
+
+        </div>
+
+        <button class="primary" onclick="findLoads()">
+          Search Loads
+        </button>
+
+        <div id="loadResults"></div>
+
+      </div>
+
+
+      <!-- POST LOAD -->
+      <div id="post" class="hidden">
+
+        <h2>Post a Load</h2>
+
+        <form onsubmit="postLoad(event)">
+
+          <div class="grid">
+
+            <div class="field">
+              <label>From City</label>
+              <input id="fromCity" required>
+            </div>
+
+            <div class="field">
+              <label>To City</label>
+              <input id="toCity" required>
+            </div>
+
+            <div class="field">
+              <label>Load Date</label>
+              <input
+                id="loadDate"
+                type="date"
+                required
+              >
+            </div>
+
+            <div class="field">
+
+              <label>Truck Type</label>
+
+              <select id="truckType" required>
+
+                <option value="">
+                  Select
+                </option>
+
+                <option>
+                  Open Body
+                </option>
+
+                <option>
+                  Container
+                </option>
+
+                <option>
+                  Trailer
+                </option>
+
+                <option>
+                  LCV
+                </option>
+
+                <option>
+                  Pickup
+                </option>
+
+              </select>
+
+            </div>
+
+            <div class="field">
+              <label>Weight</label>
+              <input
+                id="weight"
+                placeholder="e.g. 10 Ton"
+              >
+            </div>
+
+            <div class="field">
+              <label>Material</label>
+              <input
+                id="material"
+                placeholder="e.g. Steel"
+              >
+            </div>
+
+            <div class="field">
+              <label>Rate</label>
+              <input
+                id="rate"
+                placeholder="e.g. ₹25000"
+              >
+            </div>
+
+          </div>
+
+          <button class="primary">
+            Post Load
+          </button>
+
+        </form>
+
+        <div id="postMsg"></div>
+
+      </div>
+
+
+      <!-- TRUCKS -->
+      <div id="trucks" class="hidden">
+
+        <h2>My Trucks</h2>
+
+        <form onsubmit="addTruck(event)">
+
+          <div class="grid">
+
+            <div class="field">
+
+              <label>Truck Number</label>
+
+              <input
+                id="truckNumber"
+                placeholder="RJ14 XX 1234"
+                required
+              >
+
+            </div>
+
+            <div class="field">
+
+              <label>Truck Type</label>
+
+              <input
+                id="newTruckType"
+                required
+              >
+
+            </div>
+
+            <div class="field">
+
+              <label>Capacity</label>
+
+              <input
+                id="capacity"
+                placeholder="e.g. 10 Ton"
+              >
+
+            </div>
+
+          </div>
+
+          <button class="primary">
+            Add Truck
+          </button>
+
+        </form>
+
+        <div id="truckResults"></div>
+
+      </div>
+
+
+      <!-- MY LOADS -->
+      <div id="myloads" class="hidden">
+
+        <h2>My Loads</h2>
+
+        <div id="myLoadResults"></div>
+
+      </div>
+
+    </div>
+
+  </section>
+
+</main>
+
+
+<script>
+
+let token = localStorage.getItem("brc_token");
+
+let currentUser =
+  JSON.parse(
+    localStorage.getItem("brc_user") || "null"
+  );
+
+
+/* LOGIN / REGISTER TABS */
+
+function showAuth(type){
+
+  document
+    .getElementById("loginForm")
+    .classList
+    .toggle(
+      "hidden",
+      type !== "login"
+    );
+
+  document
+    .getElementById("registerForm")
+    .classList
+    .toggle(
+      "hidden",
+      type !== "register"
+    );
+
+  document
+    .getElementById("loginTab")
+    .classList
+    .toggle(
+      "active",
+      type === "login"
+    );
+
+  document
+    .getElementById("registerTab")
+    .classList
+    .toggle(
+      "active",
+      type === "register"
+    );
+
+}
+
+
+/* APP TABS */
+
+function tab(name, button){
+
+  [
+    "find",
+    "post",
+    "trucks",
+    "myloads"
+  ]
+  .forEach(
+    x =>
+      document
+        .getElementById(x)
+        .classList
+        .add("hidden")
+  );
+
+  document
+    .getElementById(name)
+    .classList
+    .remove("hidden");
+
+
+  document
+    .querySelectorAll(".tabs button")
+    .forEach(
+      b =>
+        b.classList.remove("active")
+    );
+
+  if(button){
+    button.classList.add("active");
+  }
+
+
+  if(name === "find"){
+    findLoads();
+  }
+
+  if(name === "trucks"){
+    loadTrucks();
+  }
+
+  if(name === "myloads"){
+    loadMyLoads();
+  }
+
+}
+
+
+/* API FUNCTION */
+
+async function api(url, options = {}){
+
+  options.headers = {
+    ...(options.headers || {}),
+    "Content-Type":"application/json"
+  };
+
+  if(token){
+
+    options.headers.Authorization =
+      "Bearer " + token;
+
+  }
+
+  const r =
+    await fetch(
+      url,
+      options
+    );
+
+  const data =
+    await r
+      .json()
+      .catch(
+        () => ({})
+      );
+
+  if(!r.ok){
+
+    throw new Error(
+      data.error ||
+      "Something went wrong"
+    );
+
+  }
+
+  return data;
+
+}
+
+
+/* LOGIN */
+
+async function login(e){
+
+  e.preventDefault();
+
+  try{
+
+    const data =
+      await api(
+        "/api/login",
+        {
+          method:"POST",
+
+          body:
+            JSON.stringify({
+              email:
+                loginEmail.value,
+
+              password:
+                loginPassword.value
+            })
+        }
+      );
+
+
+    token = data.token;
+
+    currentUser = data.user;
+
+
+    localStorage.setItem(
+      "brc_token",
+      token
+    );
+
+    localStorage.setItem(
+      "brc_user",
+      JSON.stringify(currentUser)
+    );
+
+
+    openApp();
+
+  }
+
+  catch(err){
+
+    authMsg.innerHTML =
+      '<div class="msg">' +
+      err.message +
+      '</div>';
+
+  }
+
+}
+
+
+/* REGISTER */
+
+async function register(e){
+
+  e.preventDefault();
+
+  try{
+
+    const data =
+      await api(
+        "/api/register",
+        {
+          method:"POST",
+
+          body:
+            JSON.stringify({
+
+              name:
+                regName.value,
+
+              email:
+                regEmail.value,
+
+              password:
+                regPassword.value,
+
+              role:
+                regRole.value
+
+            })
+        }
+      );
+
+
+    token = data.token;
+
+    currentUser = data.user;
+
+
+    localStorage.setItem(
+      "brc_token",
+      token
+    );
+
+    localStorage.setItem(
+      "brc_user",
+      JSON.stringify(currentUser)
+    );
+
+
+    openApp();
+
+  }
+
+  catch(err){
+
+    authMsg.innerHTML =
+      '<div class="msg">' +
+      err.message +
+      '</div>';
+
+  }
+
+}
+
+
+/* OPEN APP */
+
+function openApp(){
+
+  authSection
+    .classList
+    .add("hidden");
+
+  appSection
+    .classList
+    .remove("hidden");
+
+  logoutBtn
+    .classList
+    .remove("hidden");
+
+
+  userName.textContent =
+    currentUser?.name ||
+    "User";
+
+
+  loadStats();
+
+  findLoads();
+
+}
+
+
+/* LOGOUT */
+
+function logout(){
+
+  localStorage.removeItem(
+    "brc_token"
+  );
+
+  localStorage.removeItem(
+    "brc_user"
+  );
+
+  location.reload();
+
+}
+
+
+/* STATS */
+
+async function loadStats(){
+
+  try{
+
+    const s =
+      await api(
+        "/api/stats"
+      );
+
+
+    myLoads.textContent =
+      s.myLoads;
+
+    truckCount.textContent =
+      s.trucks;
+
+    openLoads.textContent =
+      s.openLoads;
+
+  }
+
+  catch(e){}
+
+}
+
+
+/* FIND LOADS */
+
+async function findLoads(){
+
+  try{
+
+    const q =
+      new URLSearchParams();
+
+
+    if(searchFrom.value){
+
+      q.set(
+        "from",
+        searchFrom.value
+      );
+
+    }
+
+
+    if(searchTo.value){
+
+      q.set(
+        "to",
+        searchTo.value
+      );
+
+    }
+
+
+    if(searchType.value){
+
+      q.set(
+        "type",
+        searchType.value
+      );
+
+    }
+
+
+    const rows =
+      await api(
+        "/api/loads?" +
+        q.toString()
+      );
+
+
+    loadResults.innerHTML =
+      rows.length
+
+      ?
+
+      rows.map(
+        l => `
+
+        <div class="load">
+
+          <strong>
+            ${escapeHtml(l.from_city)}
+            →
+            ${escapeHtml(l.to_city)}
+          </strong>
+
+          <br>
+
+          Date:
+          ${escapeHtml(l.load_date)}
+
+          |
+          Truck:
+          ${escapeHtml(l.truck_type)}
+
+          <br>
+
+          Weight:
+          ${escapeHtml(l.weight || "-")}
+
+          |
+
+          Material:
+          ${escapeHtml(l.material || "-")}
+
+          |
+
+          Rate:
+          ${escapeHtml(l.rate || "-")}
+
+          <br>
+
+          Provider:
+          ${escapeHtml(l.provider || "Unknown")}
+
+        </div>
+
+        `
+      ).join("")
+
+      :
+
+      "<p>No loads found.</p>";
+
+  }
+
+  catch(e){
+
+    loadResults.innerHTML =
+      '<div class="msg">' +
+      e.message +
+      '</div>';
+
+  }
+
+}
+
+
+/* POST LOAD */
+
+async function postLoad(e){
+
+  e.preventDefault();
+
+  try{
+
+    const d =
+      await api(
+        "/api/loads",
+        {
+          method:"POST",
+
+          body:
+            JSON.stringify({
+
+              from_city:
+                fromCity.value,
+
+              to_city:
+                toCity.value,
+
+              load_date:
+                loadDate.value,
+
+              truck_type:
+                truckType.value,
+
+              weight:
+                weight.value,
+
+              material:
+                material.value,
+
+              rate:
+                rate.value
+
+            })
+        }
+      );
+
+
+    postMsg.innerHTML =
+      '<div class="msg">' +
+      d.message +
+      '</div>';
+
+
+    e.target.reset();
+
+    loadStats();
+
+  }
+
+  catch(err){
+
+    postMsg.innerHTML =
+      '<div class="msg">' +
+      err.message +
+      '</div>';
+
+  }
+
+}
+
+
+/* ADD TRUCK */
+
+async function addTruck(e){
+
+  e.preventDefault();
+
+  try{
+
+    const d =
+      await api(
+        "/api/trucks",
+        {
+          method:"POST",
+
+          body:
+            JSON.stringify({
+
+              number:
+                truckNumber.value,
+
+              type:
+                newTruckType.value,
+
+              capacity:
+                capacity.value
+
+            })
+        }
+      );
+
+
+    e.target.reset();
+
+    loadTrucks();
+
+    loadStats();
+
+  }
+
+  catch(err){
+
+    truckResults.innerHTML =
+      '<div class="msg">' +
+      err.message +
+      '</div>';
+
+  }
+
+}
+
+
+/* LOAD TRUCKS */
+
+async function loadTrucks(){
+
+  try{
+
+    const rows =
+      await api(
+        "/api/trucks"
+      );
+
+
+    truckResults.innerHTML =
+      rows.length
+
+      ?
+
+      rows.map(
+        t => `
+
+        <div class="load">
+
+          <strong>
+            ${escapeHtml(t.number)}
+          </strong>
+
+          <br>
+
+          Type:
+          ${escapeHtml(t.type)}
+
+          |
+
+          Capacity:
+          ${escapeHtml(t.capacity || "-")}
+
+          |
+
+          Status:
+          ${escapeHtml(t.status)}
+
+          <br><br>
+
+          <button
+            class="secondary"
+            onclick="deleteTruck(${t.id})"
+          >
+            Delete
+          </button>
+
+        </div>
+
+        `
+      ).join("")
+
+      :
+
+      "<p>No trucks added yet.</p>";
+
+  }
+
+  catch(e){
+
+    truckResults.innerHTML =
+      '<div class="msg">' +
+      e.message +
+      '</div>';
+
+  }
+
+}
+
+
+/* DELETE TRUCK */
+
+async function deleteTruck(id){
+
+  if(
+    !confirm(
+      "Delete this truck?"
+    )
+  ){
+    return;
+  }
+
+
+  try{
+
+    await api(
+      "/api/trucks/" + id,
+      {
+        method:"DELETE"
+      }
+    );
+
+
+    loadTrucks();
+
+    loadStats();
+
+  }
+
+  catch(e){
+
+    alert(e.message);
+
+  }
+
+}
+
+
+/* MY LOADS */
+
+async function loadMyLoads(){
+
+  try{
+
+    const rows =
+      await api(
+        "/api/my-loads"
+      );
+
+
+    myLoadResults.innerHTML =
+      rows.length
+
+      ?
+
+      rows.map(
+        l => `
+
+        <div class="load">
+
+          <strong>
+
+            ${escapeHtml(l.from_city)}
+            →
+            ${escapeHtml(l.to_city)}
+
+          </strong>
+
+          <br>
+
+          Date:
+          ${escapeHtml(l.load_date)}
+
+          |
+
+          ${escapeHtml(l.truck_type)}
+
+          |
+
+          Status:
+          ${escapeHtml(l.status)}
+
+        </div>
+
+        `
+      ).join("")
+
+      :
+
+      "<p>You haven't posted any loads yet.</p>";
+
+  }
+
+  catch(e){
+
+    myLoadResults.innerHTML =
+      '<div class="msg">' +
+      e.message +
+      '</div>';
+
+  }
+
+}
+
+
+/* SECURITY */
+
+function escapeHtml(v){
+
+  return String(v ?? "")
+    .replace(
+      /[&<>"']/g,
+      m =>
+        ({
+          "&":"&amp;",
+          "<":"&lt;",
+          ">":"&gt;",
+          '"':"&quot;",
+          "'":"&#039;"
+        }[m])
+    );
+
+}
+
+
+/* AUTO LOGIN */
+
+if(
+  token &&
+  currentUser
+){
+
+  openApp();
+
+}
+
+</script>
+
 </body>
 </html>
