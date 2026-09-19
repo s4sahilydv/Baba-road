@@ -1,7 +1,7 @@
 {
-  "name": "brc-logistics",
+  "name": "brc",
   "version": "1.0.0",
-  "description": "BRC - Bharat Road Connect logistics marketplace",
+  "description": "BRC - Baba Road Carrier marketplace",
   "main": "server.js",
   "scripts": {"start": "node server.js", "dev": "node server.js"},
   "dependencies": {
